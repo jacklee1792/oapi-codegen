@@ -131,6 +131,9 @@ func main() {
 		if err != nil {
 			errExit("error processing flags: %v", err)
 		}
+		if opts, err = updateTemplatesFromFiles(opts); err != nil {
+			errExit("error loading template files: %v", err)
+		}
 	} else {
 		var oldConfig oldConfiguration
 		if flagConfigFile != "" {
@@ -262,6 +265,27 @@ func updateConfigFromFlags(cfg configuration) (configuration, error) {
 			strings.Join(unsupportedFlags, ", "))
 	}
 
+	return cfg, nil
+}
+
+// updateTemplatesFromFiles populates the UserTemplates field in OutputOptions using the
+// UserTemplateFiles field. If there is a shared key between UserTemplates and UserTemplateFiles,
+// the contents of the file take precedence.
+func updateTemplatesFromFiles(cfg configuration) (configuration, error) {
+	oo := &cfg.OutputOptions
+	if oo.UserTemplateFiles == nil {
+		return cfg, nil
+	}
+	if oo.UserTemplates == nil {
+		oo.UserTemplates = make(map[string]string)
+	}
+	for key, filename := range oo.UserTemplateFiles {
+		data, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return configuration{}, err
+		}
+		oo.UserTemplates[key] = string(data)
+	}
 	return cfg, nil
 }
 

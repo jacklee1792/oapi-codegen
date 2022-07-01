@@ -26,7 +26,7 @@ type GenerateOptions struct {
 	EchoServer    bool `yaml:"echo-server,omitempty"`    // EchoServer specifies whether to generate echo server boilerplate
 	GinServer     bool `yaml:"gin-server,omitempty"`     // GinServer specifies whether to generate gin server boilerplate
 	GorillaServer bool `yaml:"gorilla-server,omitempty"` // GorillaServer specifies whether to generate Gorilla server boilerplate
-	Strict        bool `yaml:"strict-server,omitempty"` // Strict specifies whether to generate strict server wrapper
+	Strict        bool `yaml:"strict-server,omitempty"`  // Strict specifies whether to generate strict server wrapper
 	Client        bool `yaml:"client,omitempty"`         // Client specifies whether to generate client boilerplate
 	Models        bool `yaml:"models,omitempty"`         // Models specifies whether to generate type definitions
 	EmbeddedSpec  bool `yaml:"embedded-spec,omitempty"`  // Whether to embed the swagger spec in the generated code
@@ -61,11 +61,12 @@ type CompatibilityOptions struct {
 
 // OutputOptions are used to modify the output code in some way.
 type OutputOptions struct {
-	SkipFmt       bool              `yaml:"skip-fmt,omitempty"`       // Whether to skip go imports on the generated code
-	SkipPrune     bool              `yaml:"skip-prune,omitempty"`     // Whether to skip pruning unused components on the generated code
-	IncludeTags   []string          `yaml:"include-tags,omitempty"`   // Only include operations that have one of these tags. Ignored when empty.
-	ExcludeTags   []string          `yaml:"exclude-tags,omitempty"`   // Exclude operations that have one of these tags. Ignored when empty.
-	UserTemplates map[string]string `yaml:"user-templates,omitempty"` // Override built-in templates from user-provided files
+	SkipFmt           bool              `yaml:"skip-fmt,omitempty"`            // Whether to skip go imports on the generated code
+	SkipPrune         bool              `yaml:"skip-prune,omitempty"`          // Whether to skip pruning unused components on the generated code
+	IncludeTags       []string          `yaml:"include-tags,omitempty"`        // Only include operations that have one of these tags. Ignored when empty.
+	ExcludeTags       []string          `yaml:"exclude-tags,omitempty"`        // Exclude operations that have one of these tags. Ignored when empty.
+	UserTemplates     map[string]string `yaml:"user-templates,omitempty"`      // Override built-in templates from user-provided files
+	UserTemplateFiles map[string]string `yaml:"user-template-files,omitempty"` // Same as UserTemplates, with filenames as values instead
 
 	ExcludeSchemas     []string `yaml:"exclude-schemas,omitempty"`      // Exclude from generation schemas with given names. Ignored when empty.
 	ResponseTypeSuffix string   `yaml:"response-type-suffix,omitempty"` // The suffix used for responses types
