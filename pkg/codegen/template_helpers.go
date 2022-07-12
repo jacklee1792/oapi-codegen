@@ -234,6 +234,11 @@ func genResponseTypeName(operationID string) string {
 	return fmt.Sprintf("%s%s", UppercaseFirstCharacter(operationID), responseTypeSuffix)
 }
 
+// genFullResponseTypeName creates the name of generated response types (given the operationID):
+func genFullResponseTypeName(operationID string) string {
+	return fmt.Sprintf("%sFull%s", UppercaseFirstCharacter(operationID), responseTypeSuffix)
+}
+
 func getResponseTypeDefinitions(op *OperationDefinition) []ResponseTypeDefinition {
 	td, err := op.GetResponseTypeDefinitions()
 	if err != nil {
@@ -280,6 +285,7 @@ var TemplateFunctions = template.FuncMap{
 	"camelCase":                  ToCamelCase,
 	"genResponsePayload":         genResponsePayload,
 	"genResponseTypeName":        genResponseTypeName,
+	"genFullResponseTypeName":    genFullResponseTypeName,
 	"genResponseUnmarshal":       genResponseUnmarshal,
 	"getResponseTypeDefinitions": getResponseTypeDefinitions,
 	"toStringArray":              toStringArray,
