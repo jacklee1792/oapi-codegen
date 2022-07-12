@@ -94,6 +94,19 @@ func genResponsePayload(operationID string) string {
 	return buffer.String()
 }
 
+// genFullResponsePayload generates the payload returned at the end of each client request function
+func genFullResponsePayload(operationID string) string {
+	var buffer = bytes.NewBufferString("")
+
+	// Here is where we build up a response:
+	fmt.Fprintf(buffer, "&%s{\n", genFullResponseTypeName(operationID))
+	fmt.Fprintf(buffer, "Body: bodyBytes,\n")
+	fmt.Fprintf(buffer, "HTTPResponse: rsp,\n")
+	fmt.Fprintf(buffer, "}")
+
+	return buffer.String()
+}
+
 // genResponseUnmarshal generates unmarshaling steps for structured response payloads
 func genResponseUnmarshal(op *OperationDefinition) string {
 	var handledCaseClauses = make(map[string]string)
@@ -284,6 +297,7 @@ var TemplateFunctions = template.FuncMap{
 	"ucFirst":                    UppercaseFirstCharacter,
 	"camelCase":                  ToCamelCase,
 	"genResponsePayload":         genResponsePayload,
+	"genFullResponsePayload":     genFullResponsePayload,
 	"genResponseTypeName":        genResponseTypeName,
 	"genFullResponseTypeName":    genFullResponseTypeName,
 	"genResponseUnmarshal":       genResponseUnmarshal,
