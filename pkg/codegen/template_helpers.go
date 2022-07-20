@@ -94,12 +94,12 @@ func genResponsePayload(operationID string) string {
 	return buffer.String()
 }
 
-// genFullResponsePayload generates the payload returned at the end of each client request function
-func genFullResponsePayload(operationID string) string {
+// genRawResponsePayload generates the payload returned at the end of each client request function
+func genRawResponsePayload(operationID string) string {
 	var buffer = bytes.NewBufferString("")
 
 	// Here is where we build up a response:
-	fmt.Fprintf(buffer, "&%s{\n", genFullResponseTypeName(operationID))
+	fmt.Fprintf(buffer, "&%s{\n", genRawResponseTypeName(operationID))
 	fmt.Fprintf(buffer, "Body: bodyBytes,\n")
 	fmt.Fprintf(buffer, "HTTPResponse: rsp,\n")
 	fmt.Fprintf(buffer, "}")
@@ -247,9 +247,9 @@ func genResponseTypeName(operationID string) string {
 	return fmt.Sprintf("%s%s", UppercaseFirstCharacter(operationID), responseTypeSuffix)
 }
 
-// genFullResponseTypeName creates the name of generated response types (given the operationID):
-func genFullResponseTypeName(operationID string) string {
-	return fmt.Sprintf("%sFull%s", UppercaseFirstCharacter(operationID), responseTypeSuffix)
+// genRawResponseTypeName creates the name of generated response types (given the operationID):
+func genRawResponseTypeName(operationID string) string {
+	return fmt.Sprintf("%Raw%s", UppercaseFirstCharacter(operationID), responseTypeSuffix)
 }
 
 func getResponseTypeDefinitions(op *OperationDefinition) []ResponseTypeDefinition {
@@ -258,6 +258,54 @@ func getResponseTypeDefinitions(op *OperationDefinition) []ResponseTypeDefinitio
 		panic(err)
 	}
 	return td
+}
+
+func hasResponseJSON200TypeDefinition(op *OperationDefinition) bool {
+	tds, err := op.GetResponseTypeDefinitions()
+	if err != nil {
+		panic(err)
+	}
+	for _, td := range tds {
+		if td.JsonName == "JSON200" {
+			return true
+		}
+	}
+	return false
+}
+
+func getResponseJSON200TypeDecl(op *OperationDefinition) string {
+	tds, err := op.GetResponseTypeDefinitions()
+	if err != nil {
+		panic(err)
+	}
+	for _, td := range tds {
+		if td.TypeName == "JSON200" {
+			return td.Schema.TypeDecl()
+		}
+	}
+	panic("expected JSON200 response, found none")
+}
+
+func getResponseJSON200Schema(op *OperationDefinition) *Schema {
+	tds, err := op.GetResponseTypeDefinitions()
+	if err != nil {
+		panic(err)
+	}
+	for _, td := range tds {
+		if td.TypeName == "JSON200" {
+			return &td.Schema
+		}
+	}
+	return nil
+}
+
+func hasPropertyWithGoFieldName(s *Schema, name string) bool {
+	for _, prop := range s.Properties {
+		if prop.GoFieldName() == name {
+			return true
+		}
+	}
+	return false
 }
 
 // Return the statusCode comparison clause from the response name.
@@ -285,26 +333,30 @@ func stripNewLines(s string) string {
 // This function map is passed to the template engine, and we can call each
 // function here by keyName from the template code.
 var TemplateFunctions = template.FuncMap{
-	"genParamArgs":               genParamArgs,
-	"genParamTypes":              genParamTypes,
-	"genParamNames":              genParamNames,
-	"genParamFmtString":          ReplacePathParamsWithStr,
-	"swaggerUriToEchoUri":        SwaggerUriToEchoUri,
-	"swaggerUriToChiUri":         SwaggerUriToChiUri,
-	"swaggerUriToGinUri":         SwaggerUriToGinUri,
-	"swaggerUriToGorillaUri":     SwaggerUriToGorillaUri,
-	"lcFirst":                    LowercaseFirstCharacter,
-	"ucFirst":                    UppercaseFirstCharacter,
-	"camelCase":                  ToCamelCase,
-	"genResponsePayload":         genResponsePayload,
-	"genFullResponsePayload":     genFullResponsePayload,
-	"genResponseTypeName":        genResponseTypeName,
-	"genFullResponseTypeName":    genFullResponseTypeName,
-	"genResponseUnmarshal":       genResponseUnmarshal,
-	"getResponseTypeDefinitions": getResponseTypeDefinitions,
-	"toStringArray":              toStringArray,
-	"lower":                      strings.ToLower,
-	"title":                      strings.Title,
-	"stripNewLines":              stripNewLines,
-	"sanitizeGoIdentity":         SanitizeGoIdentity,
+	"genParamArgs":                     genParamArgs,
+	"genParamTypes":                    genParamTypes,
+	"genParamNames":                    genParamNames,
+	"genParamFmtString":                ReplacePathParamsWithStr,
+	"swaggerUriToEchoUri":              SwaggerUriToEchoUri,
+	"swaggerUriToChiUri":               SwaggerUriToChiUri,
+	"swaggerUriToGinUri":               SwaggerUriToGinUri,
+	"swaggerUriToGorillaUri":           SwaggerUriToGorillaUri,
+	"lcFirst":                          LowercaseFirstCharacter,
+	"ucFirst":                          UppercaseFirstCharacter,
+	"camelCase":                        ToCamelCase,
+	"genResponsePayload":               genResponsePayload,
+	"genRawResponsePayload":            genRawResponsePayload,
+	"genResponseTypeName":              genResponseTypeName,
+	"genRawResponseTypeName":           genRawResponseTypeName,
+	"genResponseUnmarshal":             genResponseUnmarshal,
+	"getResponseTypeDefinitions":       getResponseTypeDefinitions,
+	"getResponseJSON200TypeDecl":       getResponseJSON200TypeDecl,
+	"hasResponseJSON200TypeDefinition": hasResponseJSON200TypeDefinition,
+	"getResponseJSON200Schema":         getResponseJSON200Schema,
+	"toStringArray":                    toStringArray,
+	"lower":                            strings.ToLower,
+	"title":                            strings.Title,
+	"stripNewLines":                    stripNewLines,
+	"sanitizeGoIdentity":               SanitizeGoIdentity,
+	"hasPropertyWithGoFieldName":       hasPropertyWithGoFieldName,
 }
