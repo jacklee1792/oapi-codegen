@@ -27,15 +27,25 @@ paths:
           required: false
           schema:
             type: integer
+      x-primary-response:
+        status-code: '200'
+        content-type: application/xml
+        metadata-properties:
+          - ok
       responses:
         200:
           description: Success
           content:
             application/xml:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Test'
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  tests:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Test'
             application/json:
               schema:
                 type: array
@@ -50,6 +60,39 @@ paths:
             application/json:
               schema:
                 type: array
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /foobar:
+    get:
+      tags:
+        - test
+      summary: Get foobar
+      operationId: getFooBarByName
+      x-primary-response:
+        status-code: '200'
+        content-type: application/json
+        metadata-properties:
+          - ok
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - baz
+                properties:
+                  ok:
+                    type: boolean
+                  baz:
+                    type: integer
+                  foobar:
+                    $ref: '#/components/schemas/FooBar'
         default:
           description: Error
           content:
@@ -90,6 +133,13 @@ paths:
 
 components:
   schemas:
+
+    FooBar:
+      properties:
+        foo:
+          type: string
+        bar:
+          type: string
 
     Test:
       properties:

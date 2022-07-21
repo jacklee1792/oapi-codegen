@@ -158,32 +158,20 @@ func TestExampleOpenAPICodeGeneration(t *testing.T) {
 	// Check that we have a package:
 	assert.Contains(t, code, "package testswagger")
 
-	// Check that response structs are generated correctly:
-	assert.Contains(t, code, "type GetTestByNameResponse struct {")
+	// GetTestByName should return a "flat" type, ignoring the "ok" metadata property
+	assert.NotContains(t, code, "type GetTestByNameResponse struct")
 
-	// Check that response structs contains fallbacks to interface for invalid types:
-	// Here an invalid array with no items.
-	assert.Contains(t, code, `
-type GetTestByNameResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]Test
-	XML200       *[]Test
-	JSON422      *[]interface{}
-	XML422       *[]interface{}
-	JSONDefault  *Error
-}`)
-
-	// Check that the helper methods are generated correctly:
-	assert.Contains(t, code, "func (r GetTestByNameResponse) Status() string {")
-	assert.Contains(t, code, "func (r GetTestByNameResponse) StatusCode() int {")
+	// Helper methods should not be generated for operations that are marked as having a primary
+	// response
+	assert.NotContains(t, code, "func (r GetTestByNameResponse) Status()")
+	assert.NotContains(t, code, "func (r GetTestByNameResponse) StatusCode()")
 	assert.Contains(t, code, "func ParseGetTestByNameResponse(rsp *http.Response) (*GetTestByNameResponse, error) {")
 
 	// Check the client method signatures:
 	assert.Contains(t, code, "type GetTestByNameParams struct {")
 	assert.Contains(t, code, "Top *int `form:\"$top,omitempty\" json:\"$top,omitempty\"`")
 	assert.Contains(t, code, "func (c *Client) GetTestByName(ctx context.Context, name string, params *GetTestByNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {")
-	assert.Contains(t, code, "func (c *ClientWithResponses) GetTestByNameWithResponse(ctx context.Context, name string, params *GetTestByNameParams, reqEditors ...RequestEditorFn) (*GetTestByNameResponse, error) {")
+	assert.Contains(t, code, "func (c *ClientWithResponses) GetTestByNameWithResponse(ctx context.Context, name string, params *GetTestByNameParams, reqEditors ...RequestEditorFn) (*[]Test, error) {")
 	assert.Contains(t, code, "DeadSince *time.Time    `json:\"dead_since,omitempty\" tag1:\"value1\" tag2:\"value2\"`")
 
 	// Make sure the generated code is valid:

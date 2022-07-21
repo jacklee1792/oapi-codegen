@@ -15,11 +15,13 @@ package codegen
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"text/template"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/labstack/echo/v4"
 )
 
@@ -264,6 +266,170 @@ func stripNewLines(s string) string {
 	return r.Replace(s)
 }
 
+type primaryResponseInfo struct {
+	statusCode         string
+	contentType        string
+	metadataProperties []string
+}
+
+// getPrimaryResponseInfo gets the x-primary-response extension data from the OperationDefinition.
+func getPrimaryResponseInfo(op *OperationDefinition) *primaryResponseInfo {
+	// Find the x-primary-response field. This is located in the top level of the
+	// OperationDefinition.
+	msg, ok := op.Spec.Extensions["x-primary-response"].(json.RawMessage)
+	if !ok {
+		return nil
+	}
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(msg, &m); err != nil {
+		panic(err)
+	}
+	info := &primaryResponseInfo{}
+	// Get status-code from x-primary-response.
+	if tmp, ok := m["status-code"]; !ok {
+		panic("no status-code key in x-primary-response")
+	} else if info.statusCode, ok = tmp.(string); !ok {
+		panic(fmt.Sprintf(
+			"expected string for status-code in x-primary-response, got %T",
+			tmp,
+		))
+	}
+	// Get content-type from x-primary-response.
+	if tmp, ok := m["content-type"]; !ok {
+		panic("no content-type key in x-primary-response")
+	} else if info.contentType, ok = tmp.(string); !ok {
+		panic(fmt.Sprintf(
+			"expected string for content-type in x-primary-response, got %T",
+			tmp,
+		))
+	}
+	// Get metadata-properties from x-primary-response.
+	if tmp, ok := m["metadata-properties"]; !ok {
+		// It's ok not to have this property.
+		return info
+	} else if props, ok := tmp.([]interface{}); !ok {
+		panic(fmt.Sprintf(
+			"expected []interface{} for metadata-properties in x-primary-response, got %T",
+			tmp,
+		))
+	} else {
+		for i, propAny := range props {
+			prop, ok := propAny.(string)
+			if !ok {
+				panic(fmt.Sprintf(
+					"expected string for metadata-properties element %v, got %T",
+					i,
+					propAny,
+				))
+			}
+			info.metadataProperties = append(info.metadataProperties, prop)
+		}
+	}
+
+	return info
+}
+
+// getPrimaryResponseTypeDefinition inspects the metadata on the OperationDefinition and returns
+// the corresponding primary ResponseTypeDefinition if it exists. If it does not exist, it returns
+// nil.
+func getPrimaryResponseTypeDefinition(op *OperationDefinition) *ResponseTypeDefinition {
+	info := getPrimaryResponseInfo(op)
+	if info == nil {
+		return nil
+	}
+	for _, td := range getResponseTypeDefinitions(op) {
+		if td.ResponseName == info.statusCode && td.ContentTypeName == info.contentType {
+			return &td
+		}
+	}
+	panic("no match found for primary response")
+}
+
+func stringSliceContains(haystack []string, needle string) bool {
+	for _, element := range haystack {
+		if element == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// getSingleNonMetadataProperty tries to get the single property in the TypeDefinition that
+// was not marked as metadata by the x-primary-response extension. It returns the property if
+// there is exactly one such property, otherwise it returns nil.
+func getSingleNonMetadataProperty(td *TypeDefinition, info *primaryResponseInfo) *Property {
+	var ret *Property
+	for _, prop := range td.Schema.Properties {
+		if !stringSliceContains(info.metadataProperties, prop.JsonFieldName) {
+			if ret != nil {
+				return nil
+			}
+			ret = &prop
+		}
+	}
+	return ret
+}
+
+// isFlatTypeDefinition checks if the property count on the TypeDefinition is 0, meaning that it's
+// a "flat" type like integer or string.
+func isFlatTypeDefinition(td *TypeDefinition) bool {
+	return len(td.Schema.Properties) == 0
+}
+
+// asReducedTypeDefinition makes a copy of the existing TypeDefinition where properties marked as
+// metadata are purged from the Schema. If all properties but one are purged, then the result
+// is flattened.
+func asReducedTypeDefinition(td ResponseTypeDefinition, info *primaryResponseInfo) *TypeDefinition {
+	// Try to reduce it to a single flat type definition
+	if prop := getSingleNonMetadataProperty(&td.TypeDefinition, info); prop != nil {
+		return &TypeDefinition{
+			TypeName: prop.JsonFieldName,
+			JsonName: prop.JsonFieldName,
+			Schema:   prop.Schema,
+		}
+	}
+	// Otherwise we cannot flatten the schema, we will purge all properties marked as metadata
+	osc := td.Schema.OAPISchema
+	for propName := range osc.Properties {
+		if stringSliceContains(info.metadataProperties, propName) {
+			delete(osc.Properties, propName)
+		}
+	}
+	sc, err := GenerateGoSchema(&openapi3.SchemaRef{Value: osc}, td.Schema.Path)
+	if err != nil {
+		panic(err)
+	}
+	return &TypeDefinition{
+		TypeName: td.TypeName,
+		JsonName: td.JsonName,
+		Schema:   sc,
+	}
+}
+
+// isFlatTypeDefinitionAfterReduction checks if the given ResponseTypeDefinition would be a flat
+// type after reduction.
+func isFlatTypeDefinitionAfterReduction(td ResponseTypeDefinition, info *primaryResponseInfo) bool {
+	return isFlatTypeDefinition(asReducedTypeDefinition(td, info))
+}
+
+// genReturnTypeName works similarly to genResponseTypeName, and substitutes the "flat"
+// name for the response name if possible.
+func genReturnTypeName(op *OperationDefinition) string {
+	defaultName := "*" + UppercaseFirstCharacter(genResponseTypeName(op.OperationId))
+	td := getPrimaryResponseTypeDefinition(op)
+	// No primary response was specified. Use the default.
+	if td == nil {
+		return defaultName
+	}
+	info := getPrimaryResponseInfo(op)
+	prop := getSingleNonMetadataProperty(&td.TypeDefinition, info)
+	// We can't use a flat name. Use the default.
+	if prop == nil {
+		return defaultName
+	}
+	return prop.GoTypeDef()
+}
+
 // This function map is passed to the template engine, and we can call each
 // function here by keyName from the template code.
 var TemplateFunctions = template.FuncMap{
@@ -287,4 +453,12 @@ var TemplateFunctions = template.FuncMap{
 	"title":                      strings.Title,
 	"stripNewLines":              stripNewLines,
 	"sanitizeGoIdentity":         SanitizeGoIdentity,
+
+	"getPrimaryResponseInfo":             getPrimaryResponseInfo,
+	"getPrimaryResponseTypeDefinition":   getPrimaryResponseTypeDefinition,
+	"getSingleNonMetadataProperty":       getSingleNonMetadataProperty,
+	"isFlatTypeDefinition":               isFlatTypeDefinition,
+	"asReducedTypeDefinition":            asReducedTypeDefinition,
+	"isFlatTypeDefinitionAfterReduction": isFlatTypeDefinitionAfterReduction,
+	"genReturnTypeName":                  genReturnTypeName,
 }

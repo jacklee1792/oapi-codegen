@@ -41,7 +41,19 @@ type ClientWithResponsesInterface interface {
 {{end}}{{/* range . $opid := .OperationId */}}
 }
 
-{{range .}}{{$opid := .OperationId}}{{$op := .}}
+{{range .}}
+{{$opid := .OperationId -}}
+{{$op := . -}}
+{{$td := getPrimaryResponseTypeDefinition . -}}
+{{$info := getPrimaryResponseInfo . -}}
+{{if and $td (isFlatTypeDefinitionAfterReduction $td $info)}}
+// Flat primary response for {{$opid}} (type definition excluded)
+{{else if $td}}
+// Non-flat primary response
+{{$reduced := asReducedTypeDefinition $td $info -}}
+type {{genResponseTypeName $opid | ucFirst}} {{$reduced.Schema.TypeDecl}}
+{{else}}
+// No primary response
 type {{genResponseTypeName $opid | ucFirst}} struct {
     Body         []byte
 	HTTPResponse *http.Response
@@ -66,14 +78,16 @@ func (r {{genResponseTypeName $opid | ucFirst}}) StatusCode() int {
     return 0
 }
 {{end}}
+{{end}}
 
 
 {{range .}}
+{{$op := .}}
 {{$opid := .OperationId -}}
 {{/* Generate client methods (with responses)*/}}
 
-// {{$opid}}{{if .HasBody}}WithBody{{end}}WithResponse request{{if .HasBody}} with arbitrary body{{end}} returning *{{genResponseTypeName $opid}}
-func (c *ClientWithResponses) {{$opid}}{{if .HasBody}}WithBody{{end}}WithResponse(ctx context.Context{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params *{{$opid}}Params{{end}}{{if .HasBody}}, contentType string, body io.Reader{{end}}, reqEditors... RequestEditorFn) (*{{genResponseTypeName $opid}}, error){
+// {{$opid}}{{if .HasBody}}WithBody{{end}}WithResponse request{{if .HasBody}} with arbitrary body{{end}} returning {{genReturnTypeName $op}}
+func (c *ClientWithResponses) {{$opid}}{{if .HasBody}}WithBody{{end}}WithResponse(ctx context.Context{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params *{{$opid}}Params{{end}}{{if .HasBody}}, contentType string, body io.Reader{{end}}, reqEditors... RequestEditorFn) ({{genReturnTypeName $op}}, error){
     rsp, err := c.{{$opid}}{{if .HasBody}}WithBody{{end}}(ctx{{genParamNames .PathParams}}{{if .RequiresParamObject}}, params{{end}}{{if .HasBody}}, contentType, body{{end}}, reqEditors...)
     if err != nil {
         return nil, err

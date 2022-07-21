@@ -37,6 +37,9 @@ type Schema struct {
 
 	// The original OpenAPIv3 Schema.
 	OAPISchema *openapi3.Schema
+
+	// The path in which this schema was created
+	Path []string
 }
 
 func (s Schema) IsRef() bool {
@@ -200,7 +203,10 @@ func GenerateGoSchema(sref *openapi3.SchemaRef, path []string) (Schema, error) {
 	// i.e. the parent schema defines a type:array, but the array has
 	// no items defined. Therefore we have at least valid Go-Code.
 	if sref == nil {
-		return Schema{GoType: "interface{}"}, nil
+		return Schema{
+			GoType: "interface{}",
+			Path:   path,
+		}, nil
 	}
 
 	schema := sref.Value
@@ -218,12 +224,14 @@ func GenerateGoSchema(sref *openapi3.SchemaRef, path []string) (Schema, error) {
 			GoType:         refType,
 			Description:    StringToGoComment(schema.Description),
 			DefineViaAlias: true,
+			Path:           path,
 		}, nil
 	}
 
 	outSchema := Schema{
 		Description: StringToGoComment(schema.Description),
 		OAPISchema:  schema,
+		Path:        path,
 	}
 
 	// AllOf is interesting, and useful. It's the union of a number of other
@@ -282,6 +290,7 @@ func GenerateGoSchema(sref *openapi3.SchemaRef, path []string) (Schema, error) {
 			// any schema.
 			outSchema.AdditionalPropertiesType = &Schema{
 				GoType: "interface{}",
+				Path:   path,
 			}
 
 			// If additional properties are defined, we will override the default
@@ -669,6 +678,7 @@ func paramToGoType(param *openapi3.Parameter, path []string) (Schema, error) {
 		return Schema{
 			GoType:      "string",
 			Description: StringToGoComment(param.Description),
+			Path:        path,
 		}, nil
 	}
 
@@ -679,6 +689,7 @@ func paramToGoType(param *openapi3.Parameter, path []string) (Schema, error) {
 		return Schema{
 			GoType:      "string",
 			Description: StringToGoComment(param.Description),
+			Path:        path,
 		}, nil
 	}
 
